@@ -20,11 +20,16 @@ def extract_entities(path_to_embs, path_to_entities=None):
     return entities    
 
 def generate_embeddings(entities, output_emb_path):
+    # Making sure that the datatype is what we're expecting
+    assert type(entities) == pd.DataFrame
+    
+    # Loading fasttext model
     model = load_model()
     
-    assert type(entities) == pd.DataFrame
+    # Filling np.array with the entity embeddings
     emb_array = populate_array(entities, model)
  
+    # Converting the array to df
     df = convert_array_to_df(entities, emb_array) 
 
     print("Saving file to parquet.")
@@ -33,11 +38,15 @@ def generate_embeddings(entities, output_emb_path):
 def populate_array(entities, model):
     print("Creating table")
     emb_array = np.zeros((len(entities), 300))
+    
+    
     for _, e in tqdm(entities.iterrows(), total=len(entities)):
         e_key = e["Entity"]
+        # Remove symbols to avoid noise in get_sentence_vector
         entity_str = e_key.replace("<", "").replace(">", "").replace("_", " ")
         entity_emb =  model.get_sentence_vector(entity_str)
         emb_array[_, :] = entity_emb
+    
     return emb_array
 
 def convert_array_to_df(entities, emb_array):
