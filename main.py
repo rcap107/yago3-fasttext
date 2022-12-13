@@ -6,10 +6,50 @@ import pandas as pd
 import pyarrow.parquet as pq
 from tqdm import tqdm
 
+import argparse
+
+
 FASTTEXT_MODEL_PATH = "~/store/cc.en.300.bin"
 
 
-def extract_entities(path_to_embs, path_to_entities=None):
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--ft_model_path",
+        default=osp.expanduser("data/cc.en.300.bin"),
+        action="store",
+        type=str,
+        help="Path to pre-trained ft model.",
+    )
+    parser.add_argument(
+        "--path_entity_types",
+        default="data/entity_types.parquet",
+        type=str,
+        action="store",
+        help="Path to file with entity types.",
+    )
+    parser.add_argument(
+        "--path_entities",
+        default="data/yago_entities.csv",
+        type=str,
+        action="store",
+        help="Path to output file that holds only entities.",
+    )
+
+    parser.add_argument(
+        "--n_dimensions",
+        default=300,
+        type=int,
+        action="store",
+        help="Output dimensions. If < 300, dimensions will be reduced accordingly.",
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+def extract_entities(path_to_entity_types, path_to_entities=None):
     # Reading pq file with KEN embeddings
     tab = pq.read_table(path_to_embs)
     entities = tab.to_pandas()
@@ -64,10 +104,11 @@ def load_model():
     
 
 if __name__ == "__main__":
-    path_to_embs = osp.expanduser("~/store/emb_mure_ken_yago3_full.parquet")
-    assert osp.exists(path_to_embs)
+    args = parse_args()
+    entity_types_path = args.path_entity_types
+    assert osp.exists(entity_types_path)
 
-    path_to_entities = "data/yago_entities.csv"
+    path_to_entities = args.path_entities
 
     if not osp.exists(path_to_entities):
         print("Extracting entities.")
@@ -75,7 +116,7 @@ if __name__ == "__main__":
     else:
         print("Loading entities.")
         entities = pd.read_csv(path_to_entities)
-    output_emb_path = "data/yago3-fasttext.parquet"
-    generate_embeddings(entities, output_emb_path)
+
+    n_dimensions = args.n_dimensions
 
     
