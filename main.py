@@ -1,6 +1,7 @@
 import os.path as osp
 
 import fasttext
+import fasttext.util
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
@@ -51,19 +52,19 @@ def parse_args():
 
 def extract_entities(path_to_entity_types, path_to_entities=None):
     # Reading pq file with KEN embeddings
-    tab = pq.read_table(path_to_embs)
+    tab = pq.read_table(path_to_entity_types)
     entities = tab.to_pandas()
 
     # Saving entities list to csv
     if path_to_entities is not None:
-        entities.to_csv(path_to_entities, index=False)
-    return entities    
+        entities["Entity"].to_csv(path_to_entities, index=False)
+    return entities
 
 
 def generate_embeddings(entities, output_emb_path, n_dimensions=300):
     # Making sure that the datatype is what we're expecting
     assert type(entities) == pd.DataFrame
-    
+
     # Loading fasttext model
     model = _load_model(n_dimensions)
 
@@ -71,9 +72,9 @@ def generate_embeddings(entities, output_emb_path, n_dimensions=300):
     emb_array = _populate_array(entities, model, n_dimensions)
 
     # Converting the array to df
-    df = convert_array_to_df(entities, emb_array) 
+    df = convert_array_to_df(entities, emb_array)
 
-    print("Saving file to parquet.")
+    print(f"Saving file to {output_emb_path}.")
     df.to_parquet(output_emb_path)
 
 
@@ -85,23 +86,24 @@ def _populate_array(entities, model, n_dimensions):
         e_key = e["Entity"]
         # Remove symbols to avoid noise in get_sentence_vector
         entity_str = e_key.replace("<", "").replace(">", "").replace("_", " ")
-        entity_emb =  model.get_sentence_vector(entity_str)
+        entity_emb = model.get_sentence_vector(entity_str)
         emb_array[_, :] = entity_emb
-    
+
     return emb_array
+
 
 def convert_array_to_df(entities, emb_array):
     print("Converting np.array to pd.DataFrame")
     df = pd.DataFrame(emb_array, index=entities["Entity"])
-    df.columns = [f'X{_}' for _ in df.columns]  # type: ignore
+    df.columns = [f"X{_}" for _ in df.columns]  # type: ignore
     return df
-    
+
 
 def _load_model(n_dimensions=300):
     print("Loading fasttext model.")
     model_path = osp.expanduser(FASTTEXT_MODEL_PATH)
     assert osp.exists(model_path)
-    
+
     model = fasttext.load_model(model_path)
 
     if n_dimensions < 300:
@@ -123,7 +125,7 @@ if __name__ == "__main__":
 
     if not osp.exists(path_to_entities):
         print("Extracting entities.")
-        entities = extract_entities(path_to_embs, path_to_entities)
+        entities = extract_entities(entity_types_path, path_to_entities)
     else:
         print("Loading entities.")
         entities = pd.read_csv(path_to_entities)
@@ -132,4 +134,3 @@ if __name__ == "__main__":
 
     output_emb_path = f"data/yago3-fasttext.{n_dimensions}.parquet"
     generate_embeddings(entities, output_emb_path, n_dimensions)
-    
